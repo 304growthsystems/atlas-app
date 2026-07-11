@@ -1,4 +1,5 @@
 import { SidebarNavigation } from "./sidebar-navigation";
+import { signout } from "@/app/actions";
 
 export function Sidebar() {
   return (
@@ -19,6 +20,7 @@ export function Sidebar() {
         <p>Project Atlas</p>
         <p className="mt-1">Prototype Build 0.1</p>
       </div>
+      <form action={signout} className="mt-4"><button className="text-sm font-semibold text-slate-300 hover:text-white">Sign out</button></form>
     </aside>
   );
 }

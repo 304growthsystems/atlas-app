@@ -6,6 +6,10 @@
 
 Approved policy decisions are recorded in [FOUNDER_DECISIONS.md](./FOUNDER_DECISIONS.md).
 
+## Advertiser contact email
+
+Advertiser contact email is trimmed and retains its submitted case. It is at most 254 characters and contains exactly one `@`, no whitespace, a 1–64 character local part, and a 1–253 character domain. The local part cannot start or end with a period or contain consecutive periods. The domain must contain at least one period. Every domain label is 1–63 ASCII letters, digits, or hyphens and cannot begin or end with a hyphen. This explicit rule is shared by application and database validation; a library email validator is not the business-policy definition.
+
 ## Tenant and identity rules
 
 1. Every business entity MUST belong to one Organization.
@@ -217,6 +221,8 @@ The initial score is the weighted sum of Inventory readiness (30%), Payment read
 
 ## Validation and concurrency rules
 
+- Advertiser email length limits are measured in Unicode code points in both application and database validation.
+- Valid JSON numeric inputs that reach campaign RPC validation MUST use canonical unsigned integer syntax. A leading-zero token such as `01` is not legal JSON and is rejected by PostgreSQL's JSON parser before the RPC can run, so it cannot be mapped to `INVALID_CAMPAIGN`.
 - All status transitions validate current status, target status, permissions, tenant scope, and required fields atomically.
 - Invoice lifecycle, Payment state, and Aging state are independent dimensions; no single Invoice status may combine them. Payment and Aging states are recalculated from financial facts under [FINANCIAL_RULES.md](./FINANCIAL_RULES.md).
 - Successful Payment value allocates proportionally across unpaid same-campaign Invoice Lines by default. Finance may manually reallocate with reason and audit history. Unapplied excess creates Advertiser Credit.
