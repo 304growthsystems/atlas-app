@@ -31,7 +31,26 @@ select col_is_unique('public','advertisers',array['organization_id','normalized_
 select col_is_unique('public','organization_memberships',array['organization_id','id'],'membership composite key');
 select fk_ok('public','opportunities',array['organization_id','assigned_membership_id'],'public','organization_memberships',array['organization_id','id'],'opportunity same-org membership');
 select fk_ok('public','placements',array['organization_id','assigned_membership_id'],'public','organization_memberships',array['organization_id','id'],'placement same-org membership');
-select index_is_partial('public','one_active_placement_per_slot','active occupancy unique');
+select ok(
+  exists (
+    select 1
+    from pg_catalog.pg_class index_class
+    join pg_catalog.pg_namespace index_namespace on index_namespace.oid=index_class.relnamespace
+    join pg_catalog.pg_index index_catalog on index_catalog.indexrelid=index_class.oid
+    join pg_catalog.pg_class table_class on table_class.oid=index_catalog.indrelid
+    join pg_catalog.pg_namespace table_namespace on table_namespace.oid=table_class.relnamespace
+    where index_namespace.nspname='public'
+      and index_class.relname='one_active_placement_per_slot'
+      and index_class.relkind='i'
+      and table_namespace.nspname='public'
+      and table_class.relname='placements'
+      and index_catalog.indisunique
+      and index_catalog.indpred is not null
+      and pg_catalog.pg_get_indexdef(index_class.oid) like 'CREATE UNIQUE INDEX one_active_placement_per_slot ON public.placements USING btree (campaign_slot_id)%'
+      and pg_catalog.pg_get_expr(index_catalog.indpred,index_catalog.indrelid) ~ '^\(status = ANY \(ARRAY\[''held''::(public\.)?placement_status, ''reserved''::(public\.)?placement_status, ''confirmed''::(public\.)?placement_status\]\)\)$'
+  ),
+  'active occupancy unique'
+);
 select function_privs_are('public','create_advertiser_with_details',array['uuid','jsonb'],'authenticated',array['EXECUTE'],'advertiser RPC privilege');
 select function_privs_are('public','reserve_campaign_slot',array['uuid','uuid','uuid','bigint'],'authenticated',array['EXECUTE'],'reservation RPC privilege');
 -- Structural privilege assertions: externally callable RPCs are authenticated-only.

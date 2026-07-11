@@ -201,24 +201,39 @@ declare uid uuid:=auth.uid(); cid uuid; n int; price bigint; currency text; org_
  insert into public.audit_events(organization_id,actor_user_id,event_type,entity_type,entity_id,details) values(org_id,uid,'campaign.created','campaign',cid,jsonb_build_object('slot_count',n,'status','selling')); return cid;
 end $$;
 create function public.reserve_campaign_slot(org_id uuid,slot_id uuid,advertiser_id uuid,sale_price_cents bigint) returns table(placement_id uuid,campaign_id uuid) language plpgsql security definer set search_path='' as $$
-declare uid uuid:=auth.uid(); mid uuid; s public.campaign_slots; c public.campaigns; a public.advertisers; oid uuid; pid uuid; begin
- if uid is null then raise exception using errcode='28000',message='AUTH_REQUIRED'; end if;
- if not public.has_org_role(org_id,array['owner','administrator','sales_manager']::public.organization_role[]) then raise exception using errcode='42501',message='NOT_AUTHORIZED'; end if;
- if slot_id is null or advertiser_id is null or sale_price_cents not between 0 and 100000000000 then raise exception using errcode='22023',message='INVALID_RESERVATION'; end if;
- select * into s from public.campaign_slots where id=slot_id and organization_id=org_id; if not found then raise exception using errcode='22023',message='INVALID_RESERVATION'; end if;
- select * into c from public.campaigns where id=s.campaign_id and organization_id=org_id and exists(select 1 from public.organizations o where o.id=org_id and o.status='active') for update;
- select * into s from public.campaign_slots where id=slot_id and organization_id=org_id and campaign_id=c.id for update;
- select * into a from public.advertisers where id=advertiser_id and organization_id=org_id and status='active';
- if not found or c.status<>'selling' or s.status<>'available' or s.standard_price_cents<0 or exists(select 1 from public.placements p where p.organization_id=org_id and p.campaign_slot_id=s.id and p.status in ('held','reserved','confirmed')) then raise exception using errcode='55000',message='RESERVATION_UNAVAILABLE'; end if;
- if c.category_exclusivity_enabled and a.category is not null and exists(select 1 from public.placements p where p.organization_id=org_id and p.campaign_id=c.id and p.status in ('held','reserved','confirmed') and lower(trim(p.category))=lower(trim(a.category)) and p.advertiser_id<>a.id) then raise exception using errcode='55000',message='CATEGORY_CONFLICT'; end if;
- select id into mid from public.organization_memberships where organization_id=org_id and user_id=uid and status='active' and role in ('owner','administrator','sales_manager'); if mid is null then raise exception using errcode='42501',message='NOT_AUTHORIZED'; end if;
- insert into public.opportunities(organization_id,advertiser_id,campaign_id,assigned_membership_id,stage,estimated_value_cents) values(org_id,a.id,c.id,mid,'reserved',sale_price_cents) returning id into oid;
- insert into public.audit_events(organization_id,actor_user_id,event_type,entity_type,entity_id,details) values(org_id,uid,'opportunity.created','opportunity',oid,jsonb_build_object('stage','reserved','campaign_id',c.id));
- insert into public.placements(organization_id,campaign_id,campaign_slot_id,advertiser_id,opportunity_id,assigned_membership_id,status,sale_price_cents,currency,category) values(org_id,c.id,s.id,a.id,oid,mid,'reserved',sale_price_cents,c.currency,a.category) returning id into pid;
- update public.campaign_slots set status='reserved',updated_at=now() where id=s.id and organization_id=org_id;
- insert into public.audit_events(organization_id,actor_user_id,event_type,entity_type,entity_id,details) values(org_id,uid,'placement.created','placement',pid,jsonb_build_object('status','reserved','slot_id',s.id));
- insert into public.audit_events(organization_id,actor_user_id,event_type,entity_type,entity_id,details) values(org_id,uid,'slot.reserved','campaign_slot',s.id,jsonb_build_object('placement_id',pid,'advertiser_id',a.id,'sale_price_cents',sale_price_cents));
- return query select pid,c.id;
+declare
+ p_organization_id constant uuid:=reserve_campaign_slot.org_id;
+ p_campaign_slot_id constant uuid:=reserve_campaign_slot.slot_id;
+ p_advertiser_id constant uuid:=reserve_campaign_slot.advertiser_id;
+ p_sale_price_cents constant bigint:=reserve_campaign_slot.sale_price_cents;
+ v_user_id uuid:=auth.uid();
+ v_membership_id uuid;
+ v_campaign_slot public.campaign_slots;
+ v_campaign public.campaigns;
+ v_advertiser public.advertisers;
+ v_opportunity_id uuid;
+ v_placement_id uuid;
+begin
+ if v_user_id is null then raise exception using errcode='28000',message='AUTH_REQUIRED'; end if;
+ if not public.has_org_role(p_organization_id,array['owner','administrator','sales_manager']::public.organization_role[]) then raise exception using errcode='42501',message='NOT_AUTHORIZED'; end if;
+ if p_campaign_slot_id is null or p_advertiser_id is null or p_sale_price_cents not between 0 and 100000000000 then raise exception using errcode='22023',message='INVALID_RESERVATION'; end if;
+ select cs.* into v_campaign_slot from public.campaign_slots as cs where cs.id=p_campaign_slot_id and cs.organization_id=p_organization_id;
+ if not found then raise exception using errcode='22023',message='INVALID_RESERVATION'; end if;
+ select c.* into v_campaign from public.campaigns as c where c.id=v_campaign_slot.campaign_id and c.organization_id=p_organization_id and exists(select 1 from public.organizations as o where o.id=p_organization_id and o.status='active') for update;
+ select cs.* into v_campaign_slot from public.campaign_slots as cs where cs.id=p_campaign_slot_id and cs.organization_id=p_organization_id and cs.campaign_id=v_campaign.id for update;
+ select a.* into v_advertiser from public.advertisers as a where a.id=p_advertiser_id and a.organization_id=p_organization_id and a.status='active';
+ if not found then raise exception using errcode='22023',message='INVALID_RESERVATION'; end if;
+ if v_campaign.status<>'selling' or v_campaign_slot.status<>'available' or v_campaign_slot.standard_price_cents<0 or exists(select 1 from public.placements as p where p.organization_id=p_organization_id and p.campaign_slot_id=v_campaign_slot.id and p.status in ('held','reserved','confirmed')) then raise exception using errcode='55000',message='RESERVATION_UNAVAILABLE'; end if;
+ if v_campaign.category_exclusivity_enabled and v_advertiser.category is not null and exists(select 1 from public.placements as p where p.organization_id=p_organization_id and p.campaign_id=v_campaign.id and p.status in ('held','reserved','confirmed') and lower(trim(p.category))=lower(trim(v_advertiser.category)) and p.advertiser_id<>v_advertiser.id) then raise exception using errcode='55000',message='CATEGORY_CONFLICT'; end if;
+ select om.id into v_membership_id from public.organization_memberships as om where om.organization_id=p_organization_id and om.user_id=v_user_id and om.status='active' and om.role in ('owner','administrator','sales_manager');
+ if v_membership_id is null then raise exception using errcode='42501',message='NOT_AUTHORIZED'; end if;
+ insert into public.opportunities as o(organization_id,advertiser_id,campaign_id,assigned_membership_id,stage,estimated_value_cents) values(p_organization_id,v_advertiser.id,v_campaign.id,v_membership_id,'reserved',p_sale_price_cents) returning o.id into v_opportunity_id;
+ insert into public.audit_events as ae(organization_id,actor_user_id,event_type,entity_type,entity_id,details) values(p_organization_id,v_user_id,'opportunity.created','opportunity',v_opportunity_id,jsonb_build_object('stage','reserved','campaign_id',v_campaign.id));
+ insert into public.placements as p(organization_id,campaign_id,campaign_slot_id,advertiser_id,opportunity_id,assigned_membership_id,status,sale_price_cents,currency,category) values(p_organization_id,v_campaign.id,v_campaign_slot.id,v_advertiser.id,v_opportunity_id,v_membership_id,'reserved',p_sale_price_cents,v_campaign.currency,v_advertiser.category) returning p.id into v_placement_id;
+ update public.campaign_slots as cs set status='reserved',updated_at=now() where cs.id=v_campaign_slot.id and cs.organization_id=p_organization_id;
+ insert into public.audit_events as ae(organization_id,actor_user_id,event_type,entity_type,entity_id,details) values(p_organization_id,v_user_id,'placement.created','placement',v_placement_id,jsonb_build_object('status','reserved','slot_id',v_campaign_slot.id));
+ insert into public.audit_events as ae(organization_id,actor_user_id,event_type,entity_type,entity_id,details) values(p_organization_id,v_user_id,'slot.reserved','campaign_slot',v_campaign_slot.id,jsonb_build_object('placement_id',v_placement_id,'advertiser_id',v_advertiser.id,'sale_price_cents',p_sale_price_cents));
+ return query select v_placement_id as placement_id,v_campaign.id as campaign_id;
 end $$;
 
 revoke all on schema public from public,anon; grant usage on schema public to authenticated;
