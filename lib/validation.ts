@@ -45,15 +45,21 @@ const canonicalInteger = (minimum: number, maximum: number) => z.string()
   .transform(Number)
   .pipe(z.number().int().min(minimum).max(maximum));
 export const campaignSchema = z.object({
-  name: z.string().trim().min(1).max(160), territory: z.string().trim().min(1).max(160), productType: z.string().trim().min(1).max(100),
+  name: z.string().trim().min(1, "Campaign name is required.").max(160), territory: z.string().trim().min(1, "Territory is required.").max(160), productType: z.string().trim().min(1, "Product type is required.").max(100),
   publicationDate: date, salesDeadline: date, artworkDeadline: date, proofDeadline: date, printDeadline: date,
   mailingQuantity: canonicalInteger(0, 10_000_000), slotCount: canonicalInteger(1, 500),
   estimatedPrintingCost: z.string().transform((v, ctx) => money(v, ctx)).pipe(z.number().int().min(0).max(100_000_000_000)), estimatedPostageCost: z.string().transform((v, ctx) => money(v, ctx)).pipe(z.number().int().min(0).max(100_000_000_000)),
   standardSlotPrice: z.string().transform((v, ctx) => money(v, ctx)).pipe(z.number().int().min(0).max(100_000_000_000)), categoryExclusivity: z.boolean(),
 }).superRefine((v, ctx) => {
-  const dates = [v.salesDeadline, v.artworkDeadline, v.proofDeadline, v.printDeadline, v.publicationDate];
-  if (dates.some((d, i) => i > 0 && d < dates[i - 1])) ctx.addIssue({ code: "custom", path: ["salesDeadline"], message: "Deadlines must follow sales, artwork, proof, print, publication order." });
+  const dates = [
+    ["salesDeadline", v.salesDeadline], ["artworkDeadline", v.artworkDeadline],
+    ["proofDeadline", v.proofDeadline], ["printDeadline", v.printDeadline],
+    ["publicationDate", v.publicationDate],
+  ] as const;
+  dates.slice(1).forEach(([field, value], index) => {
+    if (value < dates[index][1]) ctx.addIssue({ code: "custom", path: [field], message: "Dates must follow sales, artwork, proof, print, then publication order." });
+  });
 });
 function money(v: string, ctx: z.RefinementCtx) { try { return dollarsToCents(v); } catch (e) { ctx.addIssue({ code: "custom", message: (e as Error).message }); return z.NEVER; } }
 export const reservationSchema = z.object({ slotId: z.uuid(), advertiserId: z.uuid(), salePrice: z.string().transform((v, ctx) => money(v, ctx)) });
-export type ActionState = { success?: boolean; message?: string; errors?: Record<string, string[]> };
+export type ActionState = { success?: boolean; message?: string; errors?: Record<string, string[]>; values?: Record<string, string | boolean> };
