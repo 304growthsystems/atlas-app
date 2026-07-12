@@ -62,4 +62,8 @@ export const campaignSchema = z.object({
 });
 function money(v: string, ctx: z.RefinementCtx) { try { return dollarsToCents(v); } catch (e) { ctx.addIssue({ code: "custom", message: (e as Error).message }); return z.NEVER; } }
 export const reservationSchema = z.object({ slotId: z.uuid(), advertiserId: z.uuid(), salePrice: z.string().transform((v, ctx) => money(v, ctx)) });
+export const cancellationSchema = z.object({ placementId:z.uuid(), reason:z.string().trim().min(1,"A cancellation reason is required.").max(500) });
+export const campaignStatuses = ["draft","selling","artwork_collection","proofing","ready_for_print","sent_to_printer","mailed_or_published","completed","canceled"] as const;
+export const statusSchema = z.object({ id:z.uuid(), status:z.enum(campaignStatuses,{message:"Select a supported campaign status."}) });
+export const campaignCancellationSchema = z.object({ campaignId:z.uuid(), reason:z.string().trim().min(1,"A cancellation reason is required.").max(500,"Cancellation reason must be 500 characters or fewer.") });
 export type ActionState = { success?: boolean; message?: string; errors?: Record<string, string[]>; values?: Record<string, string | boolean> };

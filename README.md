@@ -2,6 +2,8 @@
 
 Atlas is a Next.js 16 and Supabase vertical slice for organization-scoped advertiser and campaign inventory workflows.
 
+The management slice adds advertiser aggregate editing and archive/restore, Draft/Selling campaign editing with safe slot resizing, forward-only lifecycle controls, reservation cancellation with preserved history, and tenant-scoped campaign reporting. Mutations are limited to Owner, Administrator, and Sales Manager and execute through transactional RPCs.
+
 ## Setup
 
 Copy `.env.example` to `.env.local` and configure `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and server-only `APP_URL` (for example `http://localhost:3000`). `APP_URL` is the sole source for the approved `/auth/callback` URL; request headers and form fields are not trusted. Configure the same callback in Supabase Auth.
