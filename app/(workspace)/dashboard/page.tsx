@@ -1,46 +1,8 @@
-import type { Metadata } from "next";
 import { ApplicationHeader } from "@/components/application-shell/application-header";
 import { PageContainer } from "@/components/application-shell/page-container";
-import { CampaignHealthCard } from "@/components/dashboard/campaign-health-card";
 import { MetricCard } from "@/components/dashboard/metric-card";
-import { PriorityList } from "@/components/dashboard/priority-list";
-import { getDashboardViewModel } from "@/lib/repositories/dashboard-repository";
-
-export const metadata: Metadata = { title: "Dashboard" };
-
-const headerActions = [
-  { label: "Add Advertiser", variant: "secondary" },
-  { label: "New Campaign", variant: "primary" },
-] as const;
-
-export default function DashboardPage() {
-  const dashboard = getDashboardViewModel();
-
-  return (
-    <>
-      <ApplicationHeader title="Dashboard" actions={headerActions} />
-      <PageContainer>
-        <section aria-labelledby="business-overview-heading">
-          <div className="mb-4">
-            <h2 id="business-overview-heading" className="text-lg font-bold">
-              Business overview
-            </h2>
-            <p className="text-sm text-slate-500">
-              The numbers that deserve your attention today.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {dashboard.metrics.map((metric) => (
-              <MetricCard key={metric.id} metric={metric} />
-            ))}
-          </div>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[1.35fr_1fr]">
-          <PriorityList priorities={dashboard.priorities} />
-          <CampaignHealthCard campaigns={dashboard.campaigns} />
-        </section>
-      </PageContainer>
-    </>
-  );
-}
+import { getCurrentContext } from "@/lib/auth";
+import { formatCurrency } from "@/lib/money";
+import { requireQueryData } from "@/lib/query";
+import { canManageFirstSlice } from "@/lib/security";
+export default async function Dashboard(){const{supabase,organizationId,membership}=await getCurrentContext();const[cr,sr,pr]=await Promise.all([supabase.from("campaigns").select("id,name,status,publication_date,print_deadline").eq("organization_id",organizationId),supabase.from("campaign_slots").select("status").eq("organization_id",organizationId),supabase.from("placements").select("status,sale_price_cents").eq("organization_id",organizationId).in("status",["reserved","confirmed","completed"])]);const campaigns=requireQueryData("dashboard campaigns",cr),slots=requireQueryData("dashboard slots",sr),placements=requireQueryData("dashboard placements",pr);const metrics=[{id:"active",label:"Active campaigns",value:String(campaigns.filter(c=>!["completed","canceled"].includes(c.status)).length),detail:"Persistent campaigns still in progress"},{id:"available",label:"Available slots",value:String(slots.filter(s=>s.status==="available").length),detail:"Inventory ready to reserve"},{id:"reserved",label:"Reserved slots",value:String(slots.filter(s=>s.status==="reserved").length),detail:"Commercially reserved inventory"},{id:"projected",label:"Projected revenue",value:formatCurrency(placements.reduce((n,p)=>n+p.sale_price_cents,0)),detail:"Reserved, confirmed, and completed placements"}];const upcoming=campaigns.filter(c=>!["completed","canceled"].includes(c.status)).sort((a,b)=>a.print_deadline.localeCompare(b.print_deadline)).slice(0,5);const actions=canManageFirstSlice(membership.role)?[{label:"Add advertiser",variant:"secondary" as const,href:"/advertisers/new"},{label:"New campaign",variant:"primary" as const,href:"/campaigns/new"}]:[];return <><ApplicationHeader title="Dashboard" actions={actions}/><PageContainer><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map(m=><MetricCard key={m.id} metric={m}/>)}</div><section className="rounded-2xl border bg-white p-5"><h2 className="text-xl font-bold">Upcoming deadlines</h2>{upcoming.length?<ul className="mt-4 divide-y">{upcoming.map(c=><li key={c.id} className="py-3"><strong>{c.name}</strong><p className="text-sm text-slate-500">Print {c.print_deadline} · Publish {c.publication_date}</p></li>)}</ul>:<p className="mt-3 text-sm text-slate-500">No active campaign deadlines yet.</p>}<p className="mt-4 border-t pt-3 text-xs text-slate-500">Collected revenue, invoices, outstanding balances, and profit are unavailable until financial workflows are implemented.</p></section></PageContainer></>}

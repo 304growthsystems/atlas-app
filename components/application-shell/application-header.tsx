@@ -1,6 +1,7 @@
 interface HeaderAction {
   label: string;
   variant: "primary" | "secondary";
+  href?: string;
 }
 
 interface ApplicationHeaderProps {
@@ -26,19 +27,17 @@ export function ApplicationHeader({
       {actions.length > 0 && (
         <div className="flex gap-3">
           {actions.map((action) => (
-            <button
+            <a
               key={action.label}
-              type="button"
-              disabled
-              title="This action will be enabled in a future development phase."
+              href={action.href ?? "#"}
               className={
                 action.variant === "primary"
-                  ? "cursor-not-allowed rounded-lg bg-red-700 px-4 py-2.5 text-sm font-bold text-white opacity-80"
-                  : "cursor-not-allowed rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold opacity-80"
+                  ? "rounded-lg bg-red-700 px-4 py-2.5 text-sm font-bold text-white"
+                  : "rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold"
               }
             >
               {action.label}
-            </button>
+            </a>
           ))}
         </div>
       )}

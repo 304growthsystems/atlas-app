@@ -1,0 +1,6 @@
+{
+  "sameSlot": { "orgId": "uuid", "campaignId": "uuid", "slotA": "uuid", "advertiserA": "uuid" },
+  "competingCategory": { "orgId": "uuid", "campaignId": "uuid", "slotA": "uuid", "slotB": "uuid", "advertiserA": "uuid", "advertiserB": "uuid" },
+  "sameAdvertiser": { "orgId": "uuid", "campaignId": "uuid", "slotA": "uuid", "slotB": "uuid", "advertiserA": "uuid" },
+  "statusTransition": { "orgId": "uuid", "campaignId": "uuid", "slotA": "uuid", "advertiserA": "uuid" }
+}
