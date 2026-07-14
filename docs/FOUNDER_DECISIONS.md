@@ -1,5 +1,15 @@
 # Atlas Founder Decisions
 
+## FD-010 — Advertiser archival with active reservations
+
+An advertiser cannot be archived while it has a Held, Reserved, or Confirmed placement. Staff must explicitly cancel those reservations first. Archived advertisers may be restored; all related opportunities, placements, and audit history remain intact.
+
+Campaign cancellation requires explicit confirmation and a nonblank reason of at most 500 characters. In one transaction, all active placements are marked Canceled with that reason, related opportunities become Lost, and occupied slots are released only when no other active placement occupies them. Campaign, placement, opportunity, and actual slot-release audit events retain actor, timestamp, reason, and related identifiers. Repeated cancellation is rejected; Completed and Canceled campaigns cannot be reopened.
+
+## FD-011 — Lifecycle authority and reporting visibility
+
+Owner and Administrator may perform every valid campaign transition. Sales Manager may advance Draft through Selling and Artwork Collection to Proofing, and may cancel only before production (Draft, Selling, or Artwork Collection). Designer may move Proofing to Ready for Print and Ready for Print to Sent to Printer. Only Owner or Administrator may mark Mailed/Published or Completed, or cancel at/after Proofing. Campaign cost and gross-margin reporting is limited to Owner, Administrator, and Finance; sales roles receive sales/revenue metrics without cost breakdowns, and Designer receives no financial-margin or cost data.
+
 ## Record conventions
 
 This is the authoritative decision log for approved Project Atlas business policy. Each entry was adopted on **July 11, 2026**. A later change must add a superseding decision rather than silently rewriting historical rationale.

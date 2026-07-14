@@ -336,6 +336,8 @@ Approved policy decisions are recorded in [FOUNDER_DECISIONS.md](./FOUNDER_DECIS
 
 ## Edge-case operating behavior
 
+Campaign cancellation is a separate destructive workflow rather than a status shortcut. It requires confirmation and a preserved reason, rejects a repeated request after the campaign becomes terminal, and atomically audits every canceled placement, lost opportunity, and slot actually released. Production/artwork readiness gates, printer submission details, mailing evidence, and closeout checklists remain deferred until their supporting records are modeled; lifecycle role authorization does not imply those records already exist.
+
 | Edge case | Required behavior |
 |---|---|
 | Hold expiration | Idempotently cancel only a still-Held placement; release its slot; retain history |

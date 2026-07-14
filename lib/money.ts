@@ -10,3 +10,4 @@ export function dollarsToCents(value: string): number {
 export function formatCurrency(cents: number, currency = "USD"): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(cents / 100);
 }
+export function formatCurrencyInput(cents:number):string{return `${Math.trunc(cents/100)}.${String(cents%100).padStart(2,"0")}`}
